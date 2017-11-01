@@ -21,6 +21,7 @@ namespace Vamtam\Budle_Gfonts;
 
 class Base {
 	private static $used_fonts;
+	private static $transient_duration = 3600 * 24;
 
 	/**
 	 * Add actions and filters
@@ -95,6 +96,49 @@ class Base {
 	}
 
 	/**
+	 * Prefetches the fonts CSS, so that the user doesn't have to request fonts.googleapis.com
+	 */
+	private static function get_inline_css( $link ) {
+		$contents = get_transient( 'vamtam-gfbundle-css' );
+
+		if ( false === $contents ) {
+			// If link is empty, early exit.
+			if ( empty( $link ) ) {
+				set_transient( 'vamtam-gfbundle-css', 'failed', self::$transient_duration );
+				return false;
+			}
+
+			// Get remote HTML file.
+			$response = wp_remote_get( $link );
+
+			// Check for errors.
+			if ( is_wp_error( $response ) ) {
+				set_transient( 'vamtam-gfbundle-css', 'failed', self::$transient_duration );
+				return false;
+			}
+
+			// Parse remote HTML file.
+			$contents = wp_remote_retrieve_body( $response );
+			// Check for error.
+			if ( is_wp_error( $contents ) || ! $contents ) {
+				set_transient( 'vamtam-gfbundle-css', 'failed', self::$transient_duration );
+				return false;
+			}
+
+			// Store remote HTML file in transient, expire after 24 hours.
+			set_transient( 'vamtam-gfbundle-css', $contents, self::$transient_duration );
+		}
+
+		// Return false if we were unable to get the contents of the googlefonts from remote.
+		if ( 'failed' === $contents ) {
+			return false;
+		}
+
+		// If we got this far then we can safely return the contents.
+		return $contents;
+	}
+
+	/**
 	 * Given a list of use Google Fonts, enqueue them using wp_enqueue_style
 	 */
 	private static function enqueue( $used, $handle  ) {
@@ -106,7 +150,13 @@ class Base {
 			$url = add_query_arg( 'subsets', $subsets, $url );
 			$url = add_query_arg( 'family', implode( '|', $used['family'] ), $url );
 
-			wp_enqueue_style( $handle, $url );
+			$css = self::get_inline_css( $url );
+
+			if ( empty( $css ) ) {
+				wp_enqueue_style( $handle, $url );
+			} else {
+				wp_add_inline_style( 'front-all', $css );
+			}
 		}
 	}
 }
