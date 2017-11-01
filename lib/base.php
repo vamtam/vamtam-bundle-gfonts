@@ -20,11 +20,21 @@
 namespace Vamtam\Budle_Gfonts;
 
 class Base {
+	private static $used_fonts;
+
 	/**
 	 * Add actions and filters
 	 */
 	public static function setup_filters() {
+		self::$used_fonts = [
+			'family' => [],
+			'subset' => [],
+		];
+
 		add_action( 'wp_print_styles', [ __CLASS__, 'clean_styles' ], 2 );
+		add_action( 'wp_footer', [ __CLASS__, 'print_revslider_fonts' ], 2 );
+
+		add_filter( 'revslider_printCleanFontImport', [ __CLASS__, 'clean_revslider_fonts' ] );
 	}
 
 	/**
@@ -57,6 +67,37 @@ class Base {
 			}
 		}
 
+		self::enqueue( $used, 'vamtam-bundled-gfonts' );
+	}
+
+	/**
+	 * Same as clean_styles(), but for Slider Revolution fonts, which do not use wp_enqueue_style
+	 */
+	public static function clean_revslider_fonts( $link ) {
+		if ( ! empty( $link ) ) {
+			$link = str_replace( '<link href="', '', $link );
+			$link = explode( '"', $link, 2 );
+
+			$parsed = wp_parse_url( $link[0] );
+
+			$args = wp_parse_args( $parsed['query'] );
+
+			self::$used_fonts['family'][] = $args['family'];
+			self::$used_fonts['subset'][] = explode( ',', $args['subset'] ?? '' );
+		}
+	}
+
+	/**
+	 * Wrapper around enqueue() for the Slider Revolution fonts
+	 */
+	public static function print_revslider_fonts() {
+		self::enqueue( self::$used_fonts, 'vamtam-bundled-gfonts-late' );
+	}
+
+	/**
+	 * Given a list of use Google Fonts, enqueue them using wp_enqueue_style
+	 */
+	private static function enqueue( $used, $handle  ) {
 		if ( count( $used['family'] ) > 0 ) {
 			$url = 'https://fonts.googleapis.com/css';
 
@@ -65,7 +106,7 @@ class Base {
 			$url = add_query_arg( 'subsets', $subsets, $url );
 			$url = add_query_arg( 'family', implode( '|', $used['family'] ), $url );
 
-			wp_enqueue_style( 'vamtam-bundled-gfonts', $url );
+			wp_enqueue_style( $handle, $url );
 		}
 	}
 }
