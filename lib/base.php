@@ -101,7 +101,7 @@ class Base {
 	private static function get_inline_css( $link ) {
 		$contents = get_transient( 'vamtam-gfbundle-css' );
 
-		if ( false === $contents ) {
+		// if ( false === $contents ) {
 			// If link is empty, early exit.
 			if ( empty( $link ) ) {
 				set_transient( 'vamtam-gfbundle-css', 'failed', self::$transient_duration );
@@ -109,7 +109,9 @@ class Base {
 			}
 
 			// Get remote HTML file.
-			$response = wp_remote_get( $link );
+			$response = wp_remote_get( $link, [
+				'user-agent' => 'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:52.0) Gecko/20100101 Firefox/52.0',
+			] );
 
 			// Check for errors.
 			if ( is_wp_error( $response ) ) {
@@ -119,6 +121,7 @@ class Base {
 
 			// Parse remote HTML file.
 			$contents = wp_remote_retrieve_body( $response );
+
 			// Check for error.
 			if ( is_wp_error( $contents ) || ! $contents ) {
 				set_transient( 'vamtam-gfbundle-css', 'failed', self::$transient_duration );
@@ -127,7 +130,7 @@ class Base {
 
 			// Store remote HTML file in transient, expire after 24 hours.
 			set_transient( 'vamtam-gfbundle-css', $contents, self::$transient_duration );
-		}
+		// }
 
 		// Return false if we were unable to get the contents of the googlefonts from remote.
 		if ( 'failed' === $contents ) {
