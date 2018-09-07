@@ -3,7 +3,7 @@
  * Plugin Name: VamTam Bundle Google Fonts
  * Plugin URI: https://vamtam.com/
  * Description: Combines requests for Google Web Fonts into a single <link> element. No configuration needed.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: VamTam
  * Author URI: https://vamtam.com/
  * License: GPL2
