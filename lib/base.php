@@ -33,6 +33,7 @@ class Base {
 		];
 
 		add_action( 'wp_print_styles', [ __CLASS__, 'clean_styles' ], 2 );
+		add_action( 'wp_print_styles', [ __CLASS__, 'add_inline_styles' ], 5 );
 		add_action( 'wp_footer', [ __CLASS__, 'print_revslider_fonts' ], 2 );
 
 		add_filter( 'revslider_printCleanFontImport', [ __CLASS__, 'clean_revslider_fonts' ] );
@@ -68,7 +69,7 @@ class Base {
 			}
 		}
 
-		self::enqueue( $used, 'vamtam-bundled-gfonts' );
+		self::enqueue( $used, '' );
 	}
 
 	/**
@@ -92,19 +93,21 @@ class Base {
 	 * Wrapper around enqueue() for the Slider Revolution fonts
 	 */
 	public static function print_revslider_fonts() {
-		self::enqueue( self::$used_fonts, 'vamtam-bundled-gfonts-late' );
+		self::enqueue( self::$used_fonts, '-late' );
 	}
 
 	/**
 	 * Prefetches the fonts CSS, so that the user doesn't have to request fonts.googleapis.com
 	 */
-	private static function get_inline_css( $link ) {
-		$contents = get_transient( 'vamtam-gfbundle-css' );
+	private static function store_inline_css( $link, $handle ) {
+		$transient_name = 'vamtam-gfbundle-css' . $handle;
 
-		// if ( false === $contents ) {
+		$contents = get_transient( $transient_name );
+
+		if ( empty( $contents ) ) {
 			// If link is empty, early exit.
 			if ( empty( $link ) ) {
-				set_transient( 'vamtam-gfbundle-css', 'failed', self::$transient_duration );
+				set_transient( $transient_name, 'failed', self::$transient_duration );
 				return false;
 			}
 
@@ -115,7 +118,7 @@ class Base {
 
 			// Check for errors.
 			if ( is_wp_error( $response ) ) {
-				set_transient( 'vamtam-gfbundle-css', 'failed', self::$transient_duration );
+				set_transient( $transient_name, 'failed', self::$transient_duration );
 				return false;
 			}
 
@@ -124,13 +127,13 @@ class Base {
 
 			// Check for error.
 			if ( is_wp_error( $contents ) || ! $contents ) {
-				set_transient( 'vamtam-gfbundle-css', 'failed', self::$transient_duration );
+				set_transient( $transient_name, 'failed', self::$transient_duration );
 				return false;
 			}
 
 			// Store remote HTML file in transient, expire after 24 hours.
-			set_transient( 'vamtam-gfbundle-css', $contents, self::$transient_duration );
-		// }
+			set_transient( $transient_name, $contents, self::$transient_duration );
+		}
 
 		// Return false if we were unable to get the contents of the googlefonts from remote.
 		if ( 'failed' === $contents ) {
@@ -142,7 +145,27 @@ class Base {
 	}
 
 	/**
-	 * Given a list of use Google Fonts, enqueue them using wp_enqueue_style
+	 * Print the inline CSS stored in the two transients
+	 */
+	public static function add_inline_styles() {
+		$handles = [ '', '-late' ];
+
+		$transient_prefix = 'vamtam-gfbundle-css';
+
+		foreach ( $handles as $handle ) {
+			$transient_name = 'vamtam-gfbundle-css' . $handle;
+
+			$contents = get_transient( $transient_name );
+
+			if ( ! empty( $contents ) && $contents !== 'failed' ) {
+				wp_add_inline_style( 'front-all', $contents );
+			}
+		}
+	}
+
+	/**
+	 * Given a list of use Google Fonts,
+	 * either store the downloaded styles or enqueue the fonts using wp_enqueue_style
 	 */
 	private static function enqueue( $used, $handle  ) {
 		if ( count( $used['family'] ) > 0 ) {
@@ -153,12 +176,10 @@ class Base {
 			$url = add_query_arg( 'subsets', $subsets, $url );
 			$url = add_query_arg( 'family', implode( '|', $used['family'] ), $url );
 
-			$css = self::get_inline_css( $url );
+			$css = self::store_inline_css( $url, $handle );
 
 			if ( empty( $css ) ) {
-				wp_enqueue_style( $handle, $url );
-			} else {
-				wp_add_inline_style( 'front-all', $css );
+				wp_enqueue_style( 'vamtam-bundled-gfonts' . $handle, $url );
 			}
 		}
 	}
