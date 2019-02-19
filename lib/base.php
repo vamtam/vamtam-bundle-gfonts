@@ -159,6 +159,7 @@ class Base {
 
 			if ( ! empty( $contents ) && $contents !== 'failed' ) {
 				wp_add_inline_style( 'front-all', $contents );
+				wp_add_inline_style( 'vamtam-front-all', $contents );
 			}
 		}
 	}
